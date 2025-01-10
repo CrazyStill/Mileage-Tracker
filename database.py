@@ -2,6 +2,7 @@ from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 from openpyxl import Workbook
 from collections import defaultdict
+from datetime import datetime
 
 db = SQLAlchemy()
 
@@ -31,6 +32,17 @@ class Trip(db.Model):
         self.odometer_start = odometer_start
 
         self.status = 'started'
+        
+    def format_time_12h(self):
+        if not self.time:
+            return 'N/A'
+        for fmt in ("%H:%M", "%H:%M:%S"):
+            try:
+                dt = datetime.strptime(self.time, fmt)
+                return dt.strftime("%I:%M %p")
+            except ValueError:
+                pass
+        return self.time
 
 def start_new_trip(date, time, sport, venue, home_team, away_team, odometer_start):
     new_trip = Trip(date, time, sport, venue, home_team, away_team, odometer_start)
