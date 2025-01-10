@@ -1,0 +1,9 @@
+sudo docker run -d \
+  --net=pihole_network \
+  --ip=192.168.86.6 \
+  --name mileage-tracker \
+  -v /home/mileage-data:/app/database \
+  -e DATABASE_PATH=/app/database/mileage_tracker.db \
+  crazystill/mileage-tracker:arm64
+
+docker buildx build --platform linux/arm64 -t crazystill/mileage-tracker:arm64 --push .

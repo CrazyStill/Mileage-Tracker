@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Edit Trip{% endblock %}
+{% block content %}
+<div class="mt-4">
+    <h1>Edit Trip</h1>
+    <form method="post">
+        <div class="form-group">
+            <label>Date:</label>
+            <input type="date" class="form-control" name="date" value="{{ trip.date }}" required>
+        </div>
+        <div class="form-group">
+            <label>Time:</label>
+            <input type="time" class="form-control" name="time" value="{{ trip.time }}" required>
+        </div>
+        <div class="form-group">
+            <label>Sport:</label>
+            <input type="text" class="form-control" name="sport" value="{{ trip.sport }}" required>
+        </div>
+        <div class="form-group">
+            <label>Venue:</label>
+            <input type="text" class="form-control" name="venue" value="{{ trip.venue }}" required>
+        </div>
+        <div class="form-group">
+            <label>Home Team:</label>
+            <input type="text" class="form-control" name="home_team" value="{{ trip.home_team }}" required>
+        </div>
+        <div class="form-group">
+            <label>Away Team:</label>
+            <input type="text" class="form-control" name="away_team" value="{{ trip.away_team }}" required>
+        </div>
+        <div class="form-group">
+            <label>Odometer Start:</label>
+            <input type="number" step="0.1" class="form-control" name="odometer_start" value="{{ trip.odometer_start }}" required>
+        </div>
+        <div class="form-group">
+            <label>Odometer End:</label>
+            <input type="number" step="0.1" class="form-control" name="odometer_end" value="{{ trip.odometer_end or '' }}">
+        </div>
+        <div class="form-group">
+            <label>Miles:</label>
+            <input type="number" step="0.1" class="form-control" name="miles" value="{{ trip.miles or '' }}">
+        </div>
+        <div class="form-group">
+            <label>Level of Play:</label>
+            <input type="text" class="form-control" name="Level_of_Play" value="{{ trip.Level_of_Play or '' }}">
+        </div>
+        <div class="form-group">
+            <label>Amount Paid:</label>
+            <input type="number" step="0.01" class="form-control" name="amount_paid" value="{{ trip.amount_paid or '' }}">
+        </div>
+        <div class="form-group">
+            <label>Status:</label>
+            <select class="form-control" name="status">
+                <option value="started" {% if trip.status == 'started' %}selected{% endif %}>Started</option>
+                <option value="completed" {% if trip.status == 'completed' %}selected{% endif %}>Completed</option>
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Update Trip</button>
+    </form>
+</div>
+{% endblock %}

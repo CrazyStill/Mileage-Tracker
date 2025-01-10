@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Totals{% endblock %}
+{% block content %}
+<div class="mt-4">
+    <h1>Totals</h1>
+    <p><strong>Total Miles:</strong> {{ '{:g}'.format(total_miles) }} Miles</p>
+    <p><strong>Total Revenue:</strong> ${{ '{:.2f}'.format(total_revenue) }}</p>
+</div>
+{% endblock %}
