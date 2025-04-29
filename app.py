@@ -1,18 +1,33 @@
+import os
 from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory, session
-from database import db, Trip, start_new_trip, finish_trip, get_started_trips, export_to_excel
+from database import (
+    db, Trip, start_new_trip, finish_trip,
+    get_started_trips, export_to_excel,
+    create_prepared_trip, get_prepared_trips, delete_prepared_trip
+)
 from sqlalchemy import func
 from functools import wraps
-import os
 
 app = Flask(__name__)
 
-DATABASE_PATH = os.getenv('DATABASE_PATH', '/app/database/mileage_tracker.db')
+# ─── DATABASE PATH SETUP ────────────────────────────────────────────────────────
+# Base directory of this script
+basedir = os.path.abspath(os.path.dirname(__file__))
+
+# Directory where we’ll keep the SQLite file
+db_dir = os.getenv('DATABASE_DIR', os.path.join(basedir, 'database'))
+# Create it if it doesn't exist
+os.makedirs(db_dir, exist_ok=True)
+
+# Full path to the DB file
+DATABASE_PATH = os.getenv('DATABASE_PATH', os.path.join(db_dir, 'mileage_tracker.db'))
 app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{DATABASE_PATH}'
-app.config['SECRET_KEY'] = 'isasecret'  
+app.config['SECRET_KEY'] = 'isasecret'
+# ────────────────────────────────────────────────────────────────────────────────
 
 db.init_app(app)
-
 with app.app_context():
+    # This will now succeed; directory is guaranteed to exist
     db.create_all()
 
 def login_required(f):
@@ -27,8 +42,7 @@ def login_required(f):
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        password = request.form['password']
-        if password == '2620':
+        if request.form['password'] == '2620':
             session['logged_in'] = True
             flash('You have successfully logged in.', 'success')
             return redirect(url_for('home'))
@@ -48,39 +62,68 @@ def logout():
 def home():
     return render_template('home.html')
 
+@app.route('/prepare_trip', methods=['GET', 'POST'])
+@login_required
+def prepare_trip():
+    if request.method == 'POST':
+        create_prepared_trip(
+            request.form['date'],
+            request.form['time'],
+            request.form['sport'],
+            request.form['venue'],
+            request.form['home_team'],
+            request.form['away_team']
+        )
+        flash('Trip prepared successfully.', 'success')
+        return redirect(url_for('home'))
+    return render_template('prepare_trip.html')
+
 @app.route('/new_trip', methods=['GET', 'POST'])
 @login_required
 def new_trip():
+    prepared = get_prepared_trips()
     if request.method == 'POST':
-        date = request.form['date']
-        time = request.form['time']
-        sport = request.form['sport']
-        venue = request.form['venue']
-        home_team = request.form['home_team']
-        away_team = request.form['away_team']
-        odometer_start = request.form['odometer_start']
-        try:
-            odometer_start = float(odometer_start)
-            start_new_trip(date, time, sport, venue, home_team, away_team, odometer_start)
-            flash('New trip started successfully.', 'success')
-            return redirect(url_for('home'))
-        except ValueError:
-            flash('Invalid odometer reading. Please enter a numeric value.', 'danger')
-    return render_template('new_trip.html')
+        # Starting a prepared trip?
+        if request.form.get('prepared_id'):
+            pid = int(request.form['prepared_id'])
+            od_start = float(request.form['odometer_start'])
+            prep = next((p for p in prepared if p.id == pid), None)
+            if not prep:
+                flash('Prepared trip not found.', 'danger')
+            else:
+                start_new_trip(
+                    prep.date, prep.time, prep.sport,
+                    prep.venue, prep.home_team, prep.away_team,
+                    od_start
+                )
+                delete_prepared_trip(pid)
+                flash('Prepared trip started.', 'success')
+        else:
+            # Free-form new trip
+            try:
+                start_new_trip(
+                    request.form['date'], request.form['time'],
+                    request.form['sport'], request.form['venue'],
+                    request.form['home_team'], request.form['away_team'],
+                    float(request.form['odometer_start'])
+                )
+                flash('New trip started successfully.', 'success')
+            except ValueError:
+                flash('Invalid odometer reading. Please enter a numeric value.', 'danger')
+        return redirect(url_for('home'))
+    return render_template('new_trip.html', prepared=prepared)
 
 @app.route('/finish_trip', methods=['GET', 'POST'])
 @login_required
 def finish_trip_route():
     if request.method == 'POST':
-        trip_id = request.form['trip_id']
-        Level_of_Play = request.form['Level_of_Play']
-        odometer_end = request.form['odometer_end']
-        amount_paid = request.form['amount_paid']
         try:
-            trip_id = int(trip_id)
-            odometer_end = float(odometer_end)
-            amount_paid = float(amount_paid)
-            finish_trip(Level_of_Play, trip_id, odometer_end, amount_paid)
+            finish_trip(
+                request.form['Level_of_Play'],
+                int(request.form['trip_id']),
+                float(request.form['odometer_end']),
+                float(request.form['amount_paid'])
+            )
             flash('Trip completed successfully.', 'success')
             return redirect(url_for('home'))
         except ValueError:
@@ -93,9 +136,18 @@ def finish_trip_route():
 @app.route('/trips')
 @login_required
 def view_trips():
+    prepared = get_prepared_trips()
     trips = Trip.query.order_by(Trip.id.desc()).all()
-    return render_template('view_trips.html', trips=trips)
+    return render_template('view_trips.html',
+                           prepared_trips=prepared,
+                           trips=trips)
 
+@app.route('/delete_prepared_trip/<int:prep_id>', methods=['POST'])
+@login_required
+def delete_prepared_trip_route(prep_id):
+    delete_prepared_trip(prep_id)
+    flash('Prepared trip removed.', 'success')
+    return redirect(url_for('view_trips'))
 
 @app.route('/edit_trip/<int:trip_id>', methods=['GET', 'POST'])
 @login_required
@@ -103,7 +155,6 @@ def edit_trip(trip_id):
     trip = Trip.query.get_or_404(trip_id)
     if request.method == 'POST':
         try:
-            # Update trip details from form data
             trip.date = request.form['date']
             trip.time = request.form['time']
             trip.sport = request.form['sport']
@@ -115,8 +166,8 @@ def edit_trip(trip_id):
             trip.odometer_end = float(odometer_end) if odometer_end else None
             miles = request.form.get('miles')
             trip.miles = float(miles) if miles else None
-            amount_paid = request.form.get('amount_paid')
             trip.Level_of_Play = request.form.get('Level_of_Play')
+            amount_paid = request.form.get('amount_paid')
             trip.amount_paid = float(amount_paid) if amount_paid else None
             trip.status = request.form['status']
             db.session.commit()
@@ -147,12 +198,9 @@ def view_totals():
 def export_data():
     filenames = export_to_excel()
     if filenames:
-        latest_file = filenames[-1]
-        directory = os.getcwd()
-        return send_from_directory(directory, latest_file, as_attachment=True)
-    else:
-        flash('No completed trips to export.', 'warning')
-        return redirect(url_for('home'))
+        return send_from_directory(os.getcwd(), filenames[-1], as_attachment=True)
+    flash('No completed trips to export.', 'warning')
+    return redirect(url_for('home'))
 
 @app.route('/clear_data', methods=['POST'])
 @login_required

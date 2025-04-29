@@ -2,7 +2,6 @@ from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 from openpyxl import Workbook
 from collections import defaultdict
-from datetime import datetime
 
 db = SQLAlchemy()
 
@@ -30,9 +29,8 @@ class Trip(db.Model):
         self.home_team = home_team
         self.away_team = away_team
         self.odometer_start = odometer_start
-
         self.status = 'started'
-        
+
     def format_time_12h(self):
         if not self.time:
             return 'N/A'
@@ -43,6 +41,17 @@ class Trip(db.Model):
             except ValueError:
                 pass
         return self.time
+
+class PreparedTrip(db.Model):
+    __tablename__ = 'prepared_trips'
+    id = db.Column(db.Integer, primary_key=True)
+    date = db.Column(db.String,  nullable=False)
+    time = db.Column(db.String,  nullable=False)
+    sport = db.Column(db.String, nullable=False)
+    venue = db.Column(db.String, nullable=False)
+    home_team = db.Column(db.String, nullable=False)
+    away_team = db.Column(db.String, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 def start_new_trip(date, time, sport, venue, home_team, away_team, odometer_start):
     new_trip = Trip(date, time, sport, venue, home_team, away_team, odometer_start)
@@ -97,18 +106,33 @@ def export_to_excel():
             if month_name not in month_sheets:
                 ws = wb.create_sheet(title=month_name)
                 ws.append(['ID', 'Date', 'Time', 'Sport', 'Venue', 'Home Team', 'Away Team',
-                           'Odometer Start', 'Odometer End', 'Miles','Level of Play', 'Amount Paid', 'Status'])
+                           'Odometer Start', 'Odometer End', 'Miles', 'Level of Play', 'Amount Paid', 'Status'])
                 month_sheets[month_name] = ws
-            else:
-                ws = month_sheets[month_name]
-
+            ws = month_sheets[month_name]
             ws.append([
                 entry.id, entry.date, entry.time, entry.sport, entry.venue, entry.home_team,
-                entry.away_team, entry.odometer_start, entry.odometer_end, entry.miles, entry.Level_of_Play,
-                entry.amount_paid, entry.status
+                entry.away_team, entry.odometer_start, entry.odometer_end,
+                entry.miles, entry.Level_of_Play, entry.amount_paid, entry.status
             ])
 
         wb.save(filename)
         filenames.append(filename)
 
     return filenames
+
+def create_prepared_trip(date, time, sport, venue, home_team, away_team):
+    p = PreparedTrip(
+        date=date, time=time, sport=sport,
+        venue=venue, home_team=home_team, away_team=away_team
+    )
+    db.session.add(p)
+    db.session.commit()
+
+def get_prepared_trips():
+    return PreparedTrip.query.order_by(PreparedTrip.created_at).all()
+
+def delete_prepared_trip(prep_id):
+    p = PreparedTrip.query.get(prep_id)
+    if p:
+        db.session.delete(p)
+        db.session.commit()
