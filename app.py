@@ -27,7 +27,6 @@ app.config['SECRET_KEY'] = 'isasecret'
 
 db.init_app(app)
 with app.app_context():
-    # This will now succeed; directory is guaranteed to exist
     db.create_all()
 
 def login_required(f):
@@ -83,7 +82,6 @@ def prepare_trip():
 def new_trip():
     prepared = get_prepared_trips()
     if request.method == 'POST':
-        # Starting a prepared trip?
         if request.form.get('prepared_id'):
             pid = int(request.form['prepared_id'])
             od_start = float(request.form['odometer_start'])
@@ -99,7 +97,6 @@ def new_trip():
                 delete_prepared_trip(pid)
                 flash('Prepared trip started.', 'success')
         else:
-            # Free-form new trip
             try:
                 start_new_trip(
                     request.form['date'], request.form['time'],
@@ -127,7 +124,7 @@ def finish_trip_route():
             flash('Trip completed successfully.', 'success')
             return redirect(url_for('home'))
         except ValueError:
-            flash('Invalid input. Please enter numeric values where required.', 'danger')
+            flash('Invalid input. Please check your entries.', 'danger')
         except Exception as e:
             flash(str(e), 'danger')
     started_trips = get_started_trips()
