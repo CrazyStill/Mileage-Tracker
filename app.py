@@ -7,8 +7,12 @@ from database import (
 )
 from sqlalchemy import func
 from functools import wraps
+from datetime import timedelta
+
+
 
 app = Flask(__name__)
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30) # Set session lifetime to 30 days
 
 # ─── DATABASE PATH SETUP ────────────────────────────────────────────────────────
 # Base directory of this script
@@ -42,6 +46,7 @@ def login_required(f):
 def login():
     if request.method == 'POST':
         if request.form['password'] == '2620':
+            session.permanent = True
             session['logged_in'] = True
             flash('You have successfully logged in.', 'success')
             return redirect(url_for('home'))
