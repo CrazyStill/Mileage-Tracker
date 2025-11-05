@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Archived {{ year }}{% endblock %}
+{% block content %}
+<div class="mt-4">
+  <h1>Archived Trips — {{ year }}</h1>
+  <p>
+    <a class="btn" href="{{ url_for('export_data') }}?year={{ year }}">Export Year {{ year }}</a>
+    <a class="btn" href="{{ url_for('archived_index') }}">Back to archived list</a>
+  </p>
+
+  <div class="table-responsive-sm">
+    <table class="table table-striped">
+      <thead>
+        <tr>
+          <th>ID</th><th>Date</th><th>Time</th><th>Venue</th><th>Sport</th>
+          <th>Home</th><th>Away</th><th>Miles</th><th>Paid</th><th>Status</th><th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for trip in trips %}
+        <tr>
+          <td>{{ trip.id }}</td>
+          <td>{{ trip.date }}</td>
+          <td>{{ trip.format_time_12h() }}</td>
+          <td>{{ trip.venue }}</td>
+          <td>{{ trip.sport }}</td>
+          <td>{{ trip.home_team }}</td>
+          <td>{{ trip.away_team }}</td>
+          <td>{{ trip.miles|round(0) if trip.miles is not none else '' }}</td>
+          <td>{% if trip.amount_paid is not none %}${{ trip.amount_paid|round(0) }}{% endif %}</td>
+          <td>{{ trip.status }}</td>
+          <td>
+            <a href="{{ url_for('edit_trip', trip_id=trip.id) }}" class="btn btn-sm btn-info">Edit</a>
+            <form action="{{ url_for('delete_trip', trip_id=trip.id) }}" method="post" style="display:inline;">
+              <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

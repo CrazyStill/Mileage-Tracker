@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2 class="mb-4">End Work Day ({{ d.day }})</h2>
+<form method="post" class="row g-3" style="max-width: 600px;">
+    <div class="col-12">
+        <fieldset class="mb-3">
+            <legend>Segments</legend>
+            <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="mode" id="mode_append" value="append" checked>
+                <label class="form-check-label" for="mode_append">Add to Day (comma-separated)</label>
+            </div>
+            <input type="text" class="form-control mb-2" name="append_segments" placeholder="...">
+            <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="mode" id="mode_overwrite" value="overwrite">
+                <label class="form-check-label" for="mode_overwrite">Edit Entire Entry (replace all segments)</label>
+            </div>
+            <input type="text" class="form-control" name="segments_csv" placeholder="Osage, City Hall, Ace hardware, ...">
+        </fieldset>
+    </div>
+    <div class="col-md-6">
+        <label for="end_odo" class="form-label">End Odometer (optional)</label>
+        <input type="number" class="form-control" id="end_odo" name="end_odo" min="0" step="1" value="{{ d.end_odo or '' }}">
+    </div>
+    <div class="col-md-6">
+        <label for="total_miles" class="form-label">Total Miles (optional for backfill without odometers)</label>
+        <input type="number" class="form-control" id="total_miles" name="total_miles" min="0" step="1" value="{{ d.total_miles or '' }}">
+    </div>
+    <div class="col-12">
+        <label for="trip_explanation" class="form-label">Trip Explanation</label>
+        <textarea class="form-control" id="trip_explanation" name="trip_explanation" rows="3">{{ d.trip_explanation or '' }}</textarea>
+    </div>
+    <div class="col-12">
+        <button type="submit" class="btn btn-primary">End Day</button>
+    </div>
+</form>
+<div class="mt-3">
+    <strong>Current route:</strong> {{ d.segments | map(attribute='location_name') | join(', ') }}
+</div>
+{% endblock %}

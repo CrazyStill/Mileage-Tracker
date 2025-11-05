@@ -1,47 +1,65 @@
 import os
-from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory, session
+import calendar
+from io import BytesIO
+from functools import wraps
+from datetime import timedelta, datetime, date
+
+from flask import (
+    Flask, render_template, request, redirect, url_for, flash,
+    send_from_directory, session, send_file
+)
+from sqlalchemy import func
+
+# ── Imports from your database module ──────────────────────────────────────────
 from database import (
     db, Trip, start_new_trip, finish_trip,
     get_started_trips, export_to_excel,
-    create_prepared_trip, get_prepared_trips, delete_prepared_trip
+    create_prepared_trip, get_prepared_trips, delete_prepared_trip,
+    WorkDay, WorkSegment, PreparedTrip,
+    archive_year, list_archived_years, get_trips_by_archived_year,
+    ensure_archive_columns
 )
-from sqlalchemy import func
-from functools import wraps
-from datetime import timedelta
 
+# ── Import Blueprints ────────────────────────────────────────────────────────
+from blueprints.work import work_bp
 
-
-app = Flask(__name__)
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30) # Set session lifetime to 30 days
-
-# ─── DATABASE PATH SETUP ────────────────────────────────────────────────────────
-# Base directory of this script
 basedir = os.path.abspath(os.path.dirname(__file__))
+app = Flask(__name__)
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)  # 30-day session
+app.config['SECRET_KEY'] = 'isasecret'
 
-# Directory where we’ll keep the SQLite file
+# ── Register Blueprints ────────────────────────────────────────────────────────
+app.register_blueprint(work_bp)
+
+# Ensure templates are not cached in debug mode
+app.config['TEMPLATES_AUTO_RELOAD'] = True
+
+# Set explicit template folder
+app.template_folder = os.path.join(basedir, 'templates')
+
+# ─── DATABASE PATH SETUP ──────────────────────────────────────────────────────
+basedir = os.path.abspath(os.path.dirname(__file__))
 db_dir = os.getenv('DATABASE_DIR', os.path.join(basedir, 'database'))
-# Create it if it doesn't exist
 os.makedirs(db_dir, exist_ok=True)
 
-# Full path to the DB file
 DATABASE_PATH = os.getenv('DATABASE_PATH', os.path.join(db_dir, 'mileage_tracker.db'))
 app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{DATABASE_PATH}'
-app.config['SECRET_KEY'] = 'isasecret'
-# ────────────────────────────────────────────────────────────────────────────────
 
+# ── INIT DB ───────────────────────────────────────────────────────────────────
 db.init_app(app)
 with app.app_context():
     db.create_all()
+    # Ensure the archived_year columns exist (adds column if missing)
+    try:
+        ensure_archive_columns(db.engine)
+    except Exception:
+        # non-fatal; app will continue to work but archive UI may fail
+        pass
 
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not session.get('logged_in'):
-            flash('Please log in to access this page.', 'warning')
-            return redirect(url_for('login'))
-        return f(*args, **kwargs)
-    return decorated_function
+# ─── AUTH SETUP ───────────────────────────────────────────────────────────────
+from auth import login_required
 
+# ─── LOGIN / LOGOUT ───────────────────────────────────────────────────────────
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -49,7 +67,8 @@ def login():
             session.permanent = True
             session['logged_in'] = True
             flash('You have successfully logged in.', 'success')
-            return redirect(url_for('home'))
+            # After login, go to the Work/Officiating chooser
+            return redirect(url_for('dashboard'))
         else:
             flash('Invalid password.', 'danger')
     return render_template('login.html')
@@ -61,11 +80,20 @@ def logout():
     flash('You have been logged out.', 'success')
     return redirect(url_for('login'))
 
+# ─── Dashboard choice (Work vs Officiating) ───────────────────────────────────
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    # Template should have buttons linking to url_for('work_list') and url_for('home')
+    return render_template('dashboard_choice.html')
+
+# Treat root as Officiating home (existing behavior)
 @app.route('/')
 @login_required
 def home():
-    return render_template('home.html')
+    return render_template('officiating_home.html')
 
+# ─── OFFICIATING ROUTES ─────────────────────────────────────────────────────
 @app.route('/prepare_trip', methods=['GET', 'POST'])
 @login_required
 def prepare_trip():
@@ -80,7 +108,7 @@ def prepare_trip():
         )
         flash('Trip prepared successfully.', 'success')
         return redirect(url_for('home'))
-    return render_template('prepare_trip.html')
+    return render_template('officiating_prepare_trip.html')
 
 @app.route('/new_trip', methods=['GET', 'POST'])
 @login_required
@@ -113,7 +141,7 @@ def new_trip():
             except ValueError:
                 flash('Invalid odometer reading. Please enter a numeric value.', 'danger')
         return redirect(url_for('home'))
-    return render_template('new_trip.html', prepared=prepared)
+    return render_template('officiating_new_trip.html', prepared=prepared)
 
 @app.route('/finish_trip', methods=['GET', 'POST'])
 @login_required
@@ -133,14 +161,15 @@ def finish_trip_route():
         except Exception as e:
             flash(str(e), 'danger')
     started_trips = get_started_trips()
-    return render_template('finish_trip.html', trips=started_trips)
+    return render_template('officiating_finish_trip.html', trips=started_trips)
 
 @app.route('/trips')
 @login_required
 def view_trips():
     prepared = get_prepared_trips()
-    trips = Trip.query.order_by(Trip.id.desc()).all()
-    return render_template('view_trips.html',
+    # show only non-archived trips in the main view
+    trips = Trip.query.filter(Trip.archived_year == None).order_by(Trip.id.desc()).all()
+    return render_template('officiating_view_trips.html',
                            prepared_trips=prepared,
                            trips=trips)
 
@@ -150,6 +179,7 @@ def delete_prepared_trip_route(prep_id):
     delete_prepared_trip(prep_id)
     flash('Prepared trip removed.', 'success')
     return redirect(url_for('view_trips'))
+
 
 @app.route('/edit_trip/<int:trip_id>', methods=['GET', 'POST'])
 @login_required
@@ -177,8 +207,9 @@ def edit_trip(trip_id):
             return redirect(url_for('view_trips'))
         except ValueError:
             flash('Invalid input. Please enter numeric values where required.', 'danger')
-    return render_template('edit_trip.html', trip=trip)
+    return render_template('officiating_edit_trip.html', trip=trip)
 
+# --- DELETE TRIP ROUTE ---
 @app.route('/delete_trip/<int:trip_id>', methods=['POST'])
 @login_required
 def delete_trip(trip_id):
@@ -191,14 +222,23 @@ def delete_trip(trip_id):
 @app.route('/totals')
 @login_required
 def view_totals():
-    total_miles = db.session.query(func.sum(Trip.miles)).scalar() or 0
-    total_revenue = db.session.query(func.sum(Trip.amount_paid)).scalar() or 0
-    return render_template('totals.html', total_miles=total_miles, total_revenue=total_revenue)
+    total_miles = db.session.query(func.sum(Trip.miles)).filter(Trip.archived_year == None).scalar() or 0
+    total_revenue = db.session.query(func.sum(Trip.amount_paid)).filter(Trip.archived_year == None).scalar() or 0
+    return render_template('officiating_totals.html', total_miles=total_miles, total_revenue=total_revenue)
 
 @app.route('/export_data')
 @login_required
 def export_data():
-    filenames = export_to_excel()
+    year = request.args.get('year')
+    if year:
+        try:
+            y = int(year)
+        except ValueError:
+            flash('Invalid year.', 'danger')
+            return redirect(url_for('home'))
+        filenames = export_to_excel(y)
+    else:
+        filenames = export_to_excel()
     if filenames:
         return send_from_directory(os.getcwd(), filenames[-1], as_attachment=True)
     flash('No completed trips to export.', 'warning')
@@ -207,13 +247,61 @@ def export_data():
 @app.route('/clear_data', methods=['POST'])
 @login_required
 def clear_data():
+    # Repurpose clear_data to archive a year if provided via form.
+    year = request.form.get('year')
+    if not year:
+        flash('No year provided. Use the Archive page to archive a year.', 'warning')
+        return redirect(url_for('archive'))
     try:
-        db.drop_all()
-        db.create_all()
-        flash('Database cleared.', 'success')
+        y = int(year)
+    except ValueError:
+        flash('Invalid year provided.', 'danger')
+        return redirect(url_for('archive'))
+    try:
+        archive_year(y)
+        flash(f'Year {y} archived. Current view now shows active year only.', 'success')
     except Exception as e:
-        flash(f'Error clearing database: {e}', 'danger')
+        flash(f'Error archiving year: {e}', 'danger')
     return redirect(url_for('home'))
 
+
+@app.route('/archive', methods=['GET', 'POST'])
+@login_required
+def archive():
+    if request.method == 'POST':
+        year = request.form.get('year')
+        try:
+            y = int(year)
+        except Exception:
+            flash('Please enter a valid year (e.g. 2024).', 'danger')
+            return redirect(url_for('archive'))
+        try:
+            archive_year(y)
+            flash(f'Year {y} archived successfully.', 'success')
+            return redirect(url_for('home'))
+        except Exception as e:
+            flash(f'Error archiving year: {e}', 'danger')
+            return redirect(url_for('archive'))
+    years = list_archived_years()
+    return render_template('archive.html', archived_years=years)
+
+
+@app.route('/archived')
+@login_required
+def archived_index():
+    years = list_archived_years()
+    return render_template('archived_index.html', archived_years=years)
+
+
+@app.route('/archived/<int:year>')
+@login_required
+def archived_year_view(year):
+    trips = get_trips_by_archived_year(year)
+    return render_template('archived_year.html', year=year, trips=trips)
+
+# ──────────────────────────────────────────────────────────────────────────────
+# ── TRIPS ────────────────────────────────────────────────────────────────────────
+
+# ─── RUN ───────────────────────────────────────────────────────────────────────
 if __name__ == '__main__':
     app.run(host='0.0.0.0')

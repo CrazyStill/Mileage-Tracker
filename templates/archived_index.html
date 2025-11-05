@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Archived Years{% endblock %}
+{% block content %}
+<div class="mt-4">
+  <h1>Archived Years</h1>
+  {% if archived_years %}
+    <ul>
+      {% for y in archived_years %}
+        <li>
+          <a href="{{ url_for('archived_year_view', year=y) }}">{{ y }}</a>
+          &nbsp; <a class="btn btn-sm btn-secondary" href="{{ url_for('export_data') }}?year={{ y }}">Export</a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>No archived years yet.</p>
+  {% endif %}
+  <a href="{{ url_for('archive') }}" class="btn">Archive a year</a>
+</div>
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Archive Year{% endblock %}
+{% block content %}
+<div class="mt-4">
+  <h1>Archive a Year</h1>
+  <p>Enter the year you want to archive (e.g. 2024). Trips for that year will be moved out of the main view but remain editable via the Archived pages.</p>
+
+  <form method="post">
+    <div class="mb-3">
+      <label for="year" class="form-label">Year</label>
+      <input type="text" class="form-control" id="year" name="year" placeholder="2024">
+    </div>
+    <button type="submit" class="btn">Archive</button>
+    <a href="{{ url_for('archived_index') }}" class="btn">View archived years</a>
+  </form>
+
+  {% if archived_years %}
+    <h2 class="mt-4">Already archived</h2>
+    <ul>
+      {% for y in archived_years %}
+        <li><a href="{{ url_for('archived_year_view', year=y) }}">{{ y }}</a></li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+</div>
+{% endblock %}

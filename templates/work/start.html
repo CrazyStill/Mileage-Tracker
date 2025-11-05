@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2 class="mb-4">Start Work Day</h2>
+<form method="post" class="row g-3" style="max-width: 600px;">
+    <div class="col-md-6">
+        <label for="day" class="form-label">Date</label>
+        <input type="date" class="form-control" id="day" name="day" value="{{ today.isoformat() }}" required>
+    </div>
+    <div class="col-md-6">
+        <label for="start_odo" class="form-label">Start Odometer (optional)</label>
+        <input type="number" class="form-control" id="start_odo" name="start_odo" min="0" step="1">
+    </div>
+    <div class="col-md-6">
+        <label for="start_location" class="form-label">Start Location</label>
+        <input type="text" class="form-control" id="start_location" name="start_location" placeholder="Osage">
+    </div>
+    <div class="col-md-6">
+        <label for="segments_csv" class="form-label">Initial Segments (comma-separated)</label>
+        <input type="text" class="form-control" id="segments_csv" name="segments_csv" placeholder="Osage, City Hall, Ace hardware">
+    </div>
+    <div class="col-12">
+        <label for="trip_explanation" class="form-label">Trip Explanation</label>
+        <textarea class="form-control" id="trip_explanation" name="trip_explanation" rows="3"></textarea>
+    </div>
+    <div class="col-12">
+        <button type="submit" class="btn btn-primary">Start</button>
+    </div>
+</form>
+{% endblock %}

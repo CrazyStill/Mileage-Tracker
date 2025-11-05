@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2 class="mb-4">Edit Work Day (Backfill / Full Edit)</h2>
+<form method="post" class="row g-3" style="max-width: 600px;">
+    <div class="col-md-6">
+        <label for="day" class="form-label">Date</label>
+        <input type="date" class="form-control" id="day" name="day" value="{{ d.day }}" required>
+    </div>
+    <div class="col-md-6">
+        <label for="status" class="form-label">Status</label>
+        <select class="form-select" id="status" name="status">
+            <option value="started" {{ 'selected' if d.status=='started' else '' }}>started</option>
+            <option value="ended" {{ 'selected' if d.status=='ended' else '' }}>ended</option>
+        </select>
+    </div>
+    <div class="col-md-6">
+        <label for="start_odo" class="form-label">Start Odometer (optional)</label>
+        <input type="number" class="form-control" id="start_odo" name="start_odo" min="0" step="1" value="{{ d.start_odo or '' }}">
+    </div>
+    <div class="col-md-6">
+        <label for="end_odo" class="form-label">End Odometer (optional)</label>
+        <input type="number" class="form-control" id="end_odo" name="end_odo" min="0" step="1" value="{{ d.end_odo or '' }}">
+    </div>
+    <div class="col-md-6">
+        <label for="total_miles" class="form-label">Total Miles (optional, used if odometers absent)</label>
+        <input type="number" class="form-control" id="total_miles" name="total_miles" min="0" step="1" value="{{ d.total_miles or '' }}">
+    </div>
+    <div class="col-md-6">
+        <label for="start_location" class="form-label">Start Location</label>
+        <input type="text" class="form-control" id="start_location" name="start_location" value="{{ d.start_location or '' }}">
+    </div>
+    <div class="col-12">
+        <label for="segments_csv" class="form-label">Segments (comma-separated, replaces all)</label>
+        <input type="text" class="form-control" id="segments_csv" name="segments_csv" value="{{ segments_csv }}">
+    </div>
+    <div class="col-12">
+        <label for="trip_explanation" class="form-label">Trip Explanation</label>
+        <textarea class="form-control" id="trip_explanation" name="trip_explanation" rows="3">{{ d.trip_explanation or '' }}</textarea>
+    </div>
+    <div class="col-12">
+        <button type="submit" class="btn btn-primary">Save</button>
+    </div>
+</form>
+{% endblock %}

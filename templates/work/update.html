@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2 class="mb-4">Update Work Day ({{ d.day }})</h2>
+<form method="post" class="row g-3" style="max-width: 600px;">
+    <div class="col-12">
+        <label for="append_segments" class="form-label">Add to Day (comma-separated)</label>
+        <input type="text" class="form-control" id="append_segments" name="append_segments" placeholder="cape aquatic center, cape splash">
+    </div>
+    <div class="col-12">
+        <label for="trip_explanation" class="form-label">Trip Explanation</label>
+        <textarea class="form-control" id="trip_explanation" name="trip_explanation" rows="3">{{ d.trip_explanation or '' }}</textarea>
+    </div>
+    <div class="col-12">
+        <button type="submit" class="btn btn-primary">Update</button>
+    </div>
+</form>
+<div class="mt-3">
+    <strong>Current route:</strong> {{ d.segments | map(attribute='location_name') | join(', ') }}
+</div>
+{% endblock %}
